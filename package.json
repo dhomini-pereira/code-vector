@@ -2,7 +2,7 @@
   "name": "code-vector",
   "version": "1.0.0",
   "description": "Software para indexar repositórios utilizando I.A. de Embeddings - RAG",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx --env-file=.env src/index.ts",
     "build": "npm run typecheck && swc src --out-dir dist --strip-leading-paths",
