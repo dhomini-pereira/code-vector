@@ -1,4 +1,4 @@
-import { and, cosineDistance, eq, gt, sql } from 'drizzle-orm';
+import { and, cosineDistance, desc, eq, gt, sql } from 'drizzle-orm';
 import type { Database } from '../../infra/database/connection/index.js';
 import { chunkModel } from '../../infra/database/models/chunk.model.js';
 import { fileModel } from '../../infra/database/models/file.model.js';
@@ -42,7 +42,7 @@ export class ChunkRepository {
       .innerJoin(fileModel, eq(chunkModel.fileId, fileModel.id))
       .innerJoin(projectModel, eq(fileModel.projectId, projectModel.id))
       .where(gt(similarity, 0.5))
-      .orderBy((t) => t.similarity)
+      .orderBy((t) => desc(t.similarity))
       .limit(10);
 
     return results ?? [];

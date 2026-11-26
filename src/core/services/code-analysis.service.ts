@@ -82,6 +82,8 @@ export class CodeAnalysisService {
   private readonly nodeTypes: Set<string>;
   private readonly containerTypes: Set<string>;
 
+  private readonly maxChunkSize = 4000;
+
   constructor(extension: Extension) {
     this.parser = new TreeSitter();
 
@@ -122,13 +124,92 @@ export class CodeAnalysisService {
       : context;
 
     if (this.nodeTypes.has(node.type)) {
-      chunks.push(this.toChunk(node, currentContext));
+      const chunk = this.toChunk(node, currentContext);
+
+      chunks.push(...this.splitChunk(chunk));
+
       return;
     }
 
     for (const child of node.namedChildren) {
       this.visit(child, chunks, currentContext);
     }
+  }
+
+  private splitChunk(chunk: CodeChunk): CodeChunk[] {
+    if (chunk.content.length <= this.maxChunkSize) {
+      return [chunk];
+    }
+
+    const lines = chunk.content.split('\n');
+
+    const chunks: CodeChunk[] = [];
+    let currentLines: string[] = [];
+    let currentSize = 0;
+    let currentStartLine = chunk.startLine;
+
+    const flush = (): void => {
+      if (currentLines.length === 0) return;
+
+      const content = currentLines.join('\n');
+
+      chunks.push({
+        ...chunk,
+        name: `${chunk.name}#${chunks.length + 1}`,
+        content,
+        startLine: currentStartLine,
+        endLine: currentStartLine + currentLines.length - 1,
+      });
+
+      currentStartLine += currentLines.length;
+      currentLines = [];
+      currentSize = 0;
+    };
+
+    for (const line of lines) {
+      if (currentSize + line.length > this.maxChunkSize && currentLines.length > 0) {
+        flush();
+      }
+
+      // Handles an individual line exceeding the limit.
+      if (line.length > this.maxChunkSize) {
+        flush();
+
+        const parts = this.splitLongLine(line, chunk);
+
+        chunks.push(
+          ...parts.map((part, index) => ({
+            ...part,
+            name: `${chunk.name}#${chunks.length + index + 1}`,
+          })),
+        );
+
+        currentStartLine++;
+        continue;
+      }
+
+      currentLines.push(line);
+      currentSize += line.length + 1;
+    }
+
+    flush();
+
+    return chunks;
+  }
+
+  private splitLongLine(line: string, chunk: CodeChunk): CodeChunk[] {
+    const parts: CodeChunk[] = [];
+
+    for (let i = 0; i < line.length; i += this.maxChunkSize) {
+      const content = line.slice(i, i + this.maxChunkSize);
+
+      parts.push({
+        ...chunk,
+        content,
+      });
+    }
+
+    return parts;
   }
 
   private toChunk(node: SyntaxNode, context: TraversalContext): CodeChunk {
