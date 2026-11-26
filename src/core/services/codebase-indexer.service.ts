@@ -49,4 +49,10 @@ export class CodebaseIndexerService {
       }
     }
   }
+
+  async search(query: string) {
+    const embedding = await this.ollama.call(query);
+
+    return this.chunkRepo.searchKnowledge(embedding);
+  }
 }
